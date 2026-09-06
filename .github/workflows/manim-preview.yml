@@ -1,0 +1,123 @@
+name: Manim PR preview
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: manim-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  render:
+    name: Render scene
+    runs-on: ubuntu-latest
+    container:
+      image: manimcommunity/manim:v0.21.0
+    steps:
+      - name: Check out pull request
+        uses: actions/checkout@v4
+
+      - name: Render low-quality preview
+        run: manim -ql src/viz/scenes/loss_gradient.py LossGradientScene
+
+      - name: Build preview page
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -eu
+          video_path="$(find media -type f -name 'LossGradientScene.mp4' -print -quit)"
+          test -n "$video_path"
+          mkdir -p preview
+          cp "$video_path" preview/LossGradientScene.mp4
+          cat > preview/index.html <<EOF
+          <!doctype html>
+          <html lang="en">
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1">
+              <title>LossGradientScene preview</title>
+              <style>
+                body { margin: 0 auto; max-width: 60rem; padding: 1rem; font-family: system-ui, sans-serif; }
+                video { display: block; width: 100%; height: auto; background: #000; }
+                code { overflow-wrap: anywhere; }
+              </style>
+            </head>
+            <body>
+              <h1>LossGradientScene</h1>
+              <p>Pull request #${PR_NUMBER} · <code>${COMMIT_SHA}</code></p>
+              <video controls playsinline preload="metadata">
+                <source src="LossGradientScene.mp4" type="video/mp4">
+                Your browser does not support HTML5 video.
+              </video>
+            </body>
+          </html>
+          EOF
+
+      - name: Upload preview artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: manim-preview-pr-${{ github.event.pull_request.number }}
+          path: preview
+          if-no-files-found: error
+
+  publish:
+    name: Publish preview
+    needs: render
+    runs-on: ubuntu-latest
+    concurrency:
+      group: manim-pages-publish
+    steps:
+      - name: Download preview artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: manim-preview-pr-${{ github.event.pull_request.number }}
+          path: preview
+
+      - name: Publish PR-specific preview
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: preview
+          destination_dir: pr-${{ github.event.pull_request.number }}
+          keep_files: true
+
+      - name: Add preview link to pull request
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const marker = '<!-- manim-preview -->';
+            const { owner, repo } = context.repo;
+            const number = context.issue.number;
+            const repoPath = repo === `${owner}.github.io` ? '' : `/${repo}`;
+            const previewUrl = `https://${owner}.github.io${repoPath}/pr-${number}/`;
+            const body = `${marker}\n🎬 [Watch the Manim preview](${previewUrl})\n\nUpdated for \`${context.payload.pull_request.head.sha.slice(0, 7)}\`.`;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number: number,
+              per_page: 100,
+            });
+            const previous = comments.find(comment =>
+              comment.user.type === 'Bot' && comment.body.includes(marker)
+            );
+            if (previous) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: previous.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: number,
+                body,
+              });
+            }
