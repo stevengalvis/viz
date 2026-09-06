@@ -102,6 +102,7 @@ class LossGradientScene(Scene):
             Write(current_loss_label),
             run_time=1.2,
         )
+        self.wait(0.7)
         self.play(FadeOut(current_loss_label), run_time=0.3)
 
         tangent = axes.plot(
@@ -126,7 +127,9 @@ class LossGradientScene(Scene):
         )
         adjustment_label = Text(
             "Adjust weight", font_size=28, color=ACTION_COLOR
-        ).next_to(direction_arrow, DOWN, buff=0.18)
+        ).next_to(
+            axes.c2p((start + next_weight) / 2, 0), DOWN, buff=0.3
+        )
         self.play(Create(direction_arrow), Write(adjustment_label), run_time=0.9)
 
         self.play(
