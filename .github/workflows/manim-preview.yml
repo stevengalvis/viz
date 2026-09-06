@@ -30,6 +30,13 @@ jobs:
             manimcommunity/manim:v0.21.0 \
             manim -ql src/viz/scenes/loss_gradient.py LossGradientScene
 
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+          ffmpeg -version
+          ffprobe -version
+
       - name: Encode Safari-compatible preview
         run: |
           set -eu
