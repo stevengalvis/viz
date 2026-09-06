@@ -47,6 +47,13 @@ and extracts a poster frame from the middle of the animation. Generated videos
 remain CI artifacts and Pages content; they are not committed to the working
 branch.
 
+Each preview page also offers commit-versioned **Download 1080p MP4** and
+**Download 720p preview** links, plus an **Open 1080p video** fallback. The
+1080p file is rendered natively by Manim at 1920×1080 and 60 FPS, then encoded
+as H.264 with `yuv420p`, CRF 18, and fast-start metadata. CI verifies its
+resolution and frame rate with FFprobe and fully decodes both published videos
+before deploying the page.
+
 ### One-time GitHub Pages setup
 
 After the workflow has run once and created the `gh-pages` branch:
