@@ -6,9 +6,9 @@ from manim import (
     BLUE,
     DOWN,
     GREEN,
+    LEFT,
     RED,
     RIGHT,
-    UP,
     YELLOW,
     Arrow,
     Axes,
@@ -16,10 +16,11 @@ from manim import (
     Dot,
     FadeIn,
     FadeOut,
-    MathTex,
     Scene,
     Text,
+    ValueTracker,
     Write,
+    always_redraw,
 )
 
 
@@ -46,14 +47,18 @@ class LossGradientScene(Scene):
         axes = Axes(
             x_range=[-2.5, 2.5, 1],
             y_range=[0, 6, 1],
-            x_length=7,
-            y_length=4.5,
-            axis_config={"include_tip": False},
+            x_length=10,
+            y_length=5.8,
+            axis_config={"include_tip": False, "stroke_width": 3},
+        ).shift(DOWN * 0.25)
+        axis_labels = axes.get_axis_labels(
+            Text("Weight", font_size=30), Text("Loss", font_size=30)
         )
-        curve = axes.plot(loss, x_range=[-2.4, 2.4], color=BLUE)
-        equation = MathTex(r"L(w)=w^2", color=BLUE).next_to(axes, UP)
+        curve = axes.plot(
+            loss, x_range=[-2.4, 2.4], color=BLUE, stroke_width=6
+        )
 
-        self.play(Create(axes), Create(curve), Write(equation), run_time=1.3)
+        self.play(Create(axes), Create(curve), Write(axis_labels), run_time=1.5)
 
         start = self.START_WEIGHT
         gradient = 2 * start
@@ -61,40 +66,58 @@ class LossGradientScene(Scene):
         start_point = axes.c2p(start, loss(start))
         end_point = axes.c2p(next_weight, loss(next_weight))
 
-        dot = Dot(start_point, color=YELLOW)
-        weight_label = Text("current weight", font_size=28, color=YELLOW).next_to(
-            dot, UP
+        weight = ValueTracker(start)
+        dot = always_redraw(
+            lambda: Dot(
+                axes.c2p(weight.get_value(), loss(weight.get_value())),
+                radius=0.16,
+                color=YELLOW,
+            )
         )
-        self.play(FadeIn(dot), Write(weight_label), run_time=0.8)
+        start_marker = Dot(
+            start_point,
+            radius=0.14,
+            color=YELLOW,
+            fill_opacity=0.25,
+            stroke_opacity=0.4,
+        )
+        weight_label = Text("Start here", font_size=30, color=YELLOW).next_to(
+            dot, LEFT, buff=0.3
+        )
+        self.play(
+            FadeIn(start_marker), FadeIn(dot), Write(weight_label), run_time=1.0
+        )
 
         tangent = axes.plot(
-            tangent_function(start), x_range=[0.9, 2.35], color=RED
+            tangent_function(start),
+            x_range=[1.65, 2.25],
+            color=RED,
+            stroke_width=7,
         )
-        slope_label = Text("slope", font_size=28, color=RED).next_to(
-            tangent, RIGHT
+        slope_label = Text("slope", font_size=30, color=RED).move_to(
+            axes.c2p(0.95, 4.8)
         )
         self.play(Create(tangent), Write(slope_label), run_time=1.0)
+        self.wait(0.3)
+        self.play(FadeOut(tangent), FadeOut(slope_label), run_time=0.5)
 
         direction_arrow = Arrow(
-            start_point + DOWN * 0.4,
-            end_point + UP * 0.25,
-            buff=0.1,
+            axes.c2p(start, 0.55),
+            axes.c2p(next_weight, 0.55),
+            buff=0,
             color=GREEN,
+            stroke_width=7,
         )
-        direction_label = Text("move downhill", font_size=28, color=GREEN).next_to(
-            direction_arrow, DOWN
-        )
-        self.play(Create(direction_arrow), Write(direction_label), run_time=0.9)
+        self.play(Create(direction_arrow), run_time=0.7)
 
         self.play(
-            dot.animate.move_to(end_point),
+            weight.animate.set_value(next_weight),
             FadeOut(weight_label),
-            FadeOut(tangent),
-            FadeOut(slope_label),
             FadeOut(direction_arrow),
-            FadeOut(direction_label),
-            run_time=1.3,
+            run_time=1.8,
         )
-        lower_loss = Text("lower loss", font_size=32, color=GREEN).next_to(dot, RIGHT)
+        lower_loss = Text("lower loss", font_size=34, color=GREEN).next_to(
+            end_point, RIGHT, buff=0.3
+        )
         self.play(Write(lower_loss), run_time=0.8)
-        self.wait(0.6)
+        self.wait(1.5)
