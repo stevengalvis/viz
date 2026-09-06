@@ -20,7 +20,7 @@ jobs:
       - name: Check out pull request
         uses: actions/checkout@v4
 
-      - name: Render low-quality preview
+      - name: Render medium-quality preview
         run: |
           docker run --rm \
             --user "$(id -u):$(id -g)" \
@@ -28,7 +28,7 @@ jobs:
             --volume "$GITHUB_WORKSPACE:/manim" \
             --workdir /manim \
             manimcommunity/manim:v0.21.0 \
-            manim -ql src/viz/scenes/loss_gradient.py LossGradientScene
+            manim -qm src/viz/scenes/loss_gradient.py LossGradientScene
 
       - name: Install FFmpeg
         run: |
