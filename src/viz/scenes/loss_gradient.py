@@ -3,13 +3,9 @@
 from collections.abc import Callable
 
 from manim import (
-    BLUE,
     DOWN,
-    GREEN,
     LEFT,
-    RED,
     RIGHT,
-    YELLOW,
     Arrow,
     Axes,
     Create,
@@ -22,6 +18,13 @@ from manim import (
     Write,
     always_redraw,
 )
+
+CURVE_COLOR = "#5DA9E9"
+NEUTRAL_COLOR = "#B8C0CC"
+GOLD_COLOR = "#F4B942"
+SLOPE_COLOR = "#FF6B6B"
+ACTION_COLOR = "#2EC4B6"
+BACKGROUND_COLOR = "#0B1020"
 
 
 def loss(weight: float) -> float:
@@ -44,21 +47,28 @@ class LossGradientScene(Scene):
     LEARNING_RATE = 0.2
 
     def construct(self) -> None:
+        self.camera.background_color = BACKGROUND_COLOR
+
         axes = Axes(
             x_range=[-2.5, 2.5, 1],
             y_range=[0, 6, 1],
             x_length=10,
             y_length=5.8,
-            axis_config={"include_tip": False, "stroke_width": 3},
+            axis_config={
+                "color": NEUTRAL_COLOR,
+                "include_tip": False,
+                "stroke_width": 3,
+            },
         ).shift(DOWN * 0.25)
         axis_labels = axes.get_axis_labels(
-            Text("Weight", font_size=30), Text("Loss", font_size=30)
+            Text("Weight", font_size=30, color=NEUTRAL_COLOR),
+            Text("Loss", font_size=30, color=NEUTRAL_COLOR),
         )
         curve = axes.plot(
-            loss, x_range=[-2.4, 2.4], color=BLUE, stroke_width=6
+            loss, x_range=[-2.4, 2.4], color=CURVE_COLOR, stroke_width=6
         )
 
-        self.play(Create(axes), Create(curve), Write(axis_labels), run_time=1.5)
+        self.play(Create(axes), Create(curve), Write(axis_labels), run_time=1.8)
 
         start = self.START_WEIGHT
         gradient = 2 * start
@@ -71,53 +81,63 @@ class LossGradientScene(Scene):
             lambda: Dot(
                 axes.c2p(weight.get_value(), loss(weight.get_value())),
                 radius=0.16,
-                color=YELLOW,
+                color=GOLD_COLOR,
             )
         )
         start_marker = Dot(
             start_point,
             radius=0.14,
-            color=YELLOW,
+            color=GOLD_COLOR,
             fill_opacity=0.25,
             stroke_opacity=0.4,
         )
-        weight_label = Text("Start here", font_size=30, color=YELLOW).next_to(
+        current_loss_label = Text(
+            "Current loss", font_size=30, color=GOLD_COLOR
+        ).next_to(
             dot, LEFT, buff=0.3
         )
         self.play(
-            FadeIn(start_marker), FadeIn(dot), Write(weight_label), run_time=1.0
+            FadeIn(start_marker),
+            FadeIn(dot),
+            Write(current_loss_label),
+            run_time=1.2,
         )
+        self.play(FadeOut(current_loss_label), run_time=0.3)
 
         tangent = axes.plot(
             tangent_function(start),
             x_range=[1.65, 2.25],
-            color=RED,
+            color=SLOPE_COLOR,
             stroke_width=7,
         )
-        slope_label = Text("slope", font_size=30, color=RED).move_to(
+        slope_label = Text("slope", font_size=30, color=SLOPE_COLOR).move_to(
             axes.c2p(0.95, 4.8)
         )
-        self.play(Create(tangent), Write(slope_label), run_time=1.0)
-        self.wait(0.3)
-        self.play(FadeOut(tangent), FadeOut(slope_label), run_time=0.5)
+        self.play(Create(tangent), Write(slope_label), run_time=1.3)
+        self.wait(0.5)
+        self.play(FadeOut(tangent), FadeOut(slope_label), run_time=0.6)
 
         direction_arrow = Arrow(
             axes.c2p(start, 0.55),
             axes.c2p(next_weight, 0.55),
             buff=0,
-            color=GREEN,
+            color=ACTION_COLOR,
             stroke_width=7,
         )
-        self.play(Create(direction_arrow), run_time=0.7)
+        adjustment_label = Text(
+            "Adjust weight", font_size=28, color=ACTION_COLOR
+        ).next_to(direction_arrow, DOWN, buff=0.18)
+        self.play(Create(direction_arrow), Write(adjustment_label), run_time=0.9)
 
         self.play(
             weight.animate.set_value(next_weight),
-            FadeOut(weight_label),
-            FadeOut(direction_arrow),
-            run_time=1.8,
+            run_time=2.4,
         )
-        lower_loss = Text("lower loss", font_size=34, color=GREEN).next_to(
+        self.play(
+            FadeOut(direction_arrow), FadeOut(adjustment_label), run_time=0.3
+        )
+        lower_loss = Text("Lower loss", font_size=34, color=ACTION_COLOR).next_to(
             end_point, RIGHT, buff=0.3
         )
-        self.play(Write(lower_loss), run_time=0.8)
-        self.wait(1.5)
+        self.play(Write(lower_loss), run_time=1.0)
+        self.wait(1.8)
