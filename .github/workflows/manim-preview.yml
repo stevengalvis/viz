@@ -16,14 +16,19 @@ jobs:
   render:
     name: Render scene
     runs-on: ubuntu-latest
-    container:
-      image: manimcommunity/manim:v0.21.0
     steps:
       - name: Check out pull request
         uses: actions/checkout@v4
 
       - name: Render low-quality preview
-        run: manim -ql src/viz/scenes/loss_gradient.py LossGradientScene
+        run: |
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            --env HOME=/tmp \
+            --volume "$GITHUB_WORKSPACE:/manim" \
+            --workdir /manim \
+            manimcommunity/manim:v0.21.0 \
+            manim -ql src/viz/scenes/loss_gradient.py LossGradientScene
 
       - name: Build preview page
         env:
