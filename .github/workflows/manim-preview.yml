@@ -30,16 +30,47 @@ jobs:
             manimcommunity/manim:v0.21.0 \
             manim -ql src/viz/scenes/loss_gradient.py LossGradientScene
 
+      - name: Encode Safari-compatible preview
+        run: |
+          set -eu
+          video_path="$(find media -type f -name 'LossGradientScene.mp4' -print -quit)"
+          test -n "$video_path"
+          mkdir -p preview
+
+          ffmpeg -y \
+            -i "$video_path" \
+            -map 0:v:0 \
+            -map '0:a:0?' \
+            -c:v libx264 \
+            -preset medium \
+            -crf 25 \
+            -pix_fmt yuv420p \
+            -c:a aac \
+            -b:a 128k \
+            -movflags +faststart \
+            preview/LossGradientScene.mp4
+
+          duration="$(ffprobe -v error -show_entries format=duration \
+            -of default=noprint_wrappers=1:nokey=1 preview/LossGradientScene.mp4)"
+          midpoint="$(awk -v duration="$duration" 'BEGIN { printf "%.3f", duration / 2 }')"
+          ffmpeg -y \
+            -ss "$midpoint" \
+            -i preview/LossGradientScene.mp4 \
+            -frames:v 1 \
+            -q:v 2 \
+            preview/poster.jpg
+
+          test -s preview/LossGradientScene.mp4
+          test -s preview/poster.jpg
+
       - name: Build preview page
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -eu
-          video_path="$(find media -type f -name 'LossGradientScene.mp4' -print -quit)"
-          test -n "$video_path"
-          mkdir -p preview
-          cp "$video_path" preview/LossGradientScene.mp4
+          test -s preview/LossGradientScene.mp4
+          test -s preview/poster.jpg
           cat > preview/index.html <<EOF
           <!doctype html>
           <html lang="en">
@@ -56,7 +87,7 @@ jobs:
             <body>
               <h1>LossGradientScene</h1>
               <p>Pull request #${PR_NUMBER} · <code>${COMMIT_SHA}</code></p>
-              <video controls playsinline preload="metadata">
+              <video controls playsinline preload="metadata" poster="poster.jpg">
                 <source src="LossGradientScene.mp4" type="video/mp4">
                 Your browser does not support HTML5 video.
               </video>

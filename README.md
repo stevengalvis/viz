@@ -41,8 +41,11 @@ updated pull request. If rendering succeeds, it publishes a small HTML page at
 a PR-specific path such as `https://<owner>.github.io/<repository>/pr-1/` and
 adds or updates a comment on the pull request with that link. The page embeds
 the MP4 in a mobile-friendly HTML5 video player, so it can be watched directly
-in Safari on an iPhone or iPad. Generated videos remain CI artifacts and Pages
-content; they are not committed to the working branch.
+in Safari on an iPhone or iPad. Before publishing, CI re-encodes the preview as
+H.264 with a `yuv420p` pixel format, optional AAC audio, and fast-start metadata,
+and extracts a poster frame from the middle of the animation. Generated videos
+remain CI artifacts and Pages content; they are not committed to the working
+branch.
 
 ### One-time GitHub Pages setup
 
