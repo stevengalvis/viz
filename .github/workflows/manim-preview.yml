@@ -26,6 +26,17 @@ jobs:
           python -m pip install "pytest>=8,<9"
           python -m pytest
 
+      - name: Smoke-check scene imports in Manim container
+        run: |
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            --env HOME=/tmp \
+            --volume "$GITHUB_WORKSPACE:/manim" \
+            --workdir /manim \
+            --env PYTHONPATH=/manim/src \
+            manimcommunity/manim:v0.21.0 \
+            python -c "import viz.calculations; import viz.scenes.loss_gradient; import viz.scenes.squared_error"
+
       - name: Render 720p previews and native 1080p exports
         run: |
           set -eu
@@ -41,6 +52,7 @@ jobs:
                 --env HOME=/tmp \
                 --volume "$GITHUB_WORKSPACE:/manim" \
                 --workdir /manim \
+                --env PYTHONPATH=/manim/src \
                 manimcommunity/manim:v0.21.0 \
                 manim -q"$quality" "src/viz/scenes/$file" "$class"
             done
