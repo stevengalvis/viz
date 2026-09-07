@@ -21,12 +21,18 @@ python -m pip install -e ".[test]"
 python -m pytest
 ```
 
-## Render the loss-gradient scene
+## Render a scene
 
 With the virtual environment activated, render a low-quality preview:
 
 ```bash
 manim -pql src/viz/scenes/loss_gradient.py LossGradientScene
+```
+
+To render the squared-error example instead, run:
+
+```bash
+manim -pql src/viz/scenes/squared_error.py SquaredErrorScene
 ```
 
 Manim writes the rendered video under `media/videos/` by default. The `-p`
@@ -35,7 +41,8 @@ headless environment.
 
 ## Pull request video previews
 
-The `Manim PR preview` GitHub Actions workflow renders `LossGradientScene` in
+The `Manim PR preview` GitHub Actions workflow renders both `LossGradientScene`
+and `SquaredErrorScene` in
 the official Manim Community 0.21 Docker image for every opened, reopened, or
 updated pull request. If rendering succeeds, it publishes a small HTML page at
 a PR-specific path such as `https://<owner>.github.io/<repository>/pr-1/` and
@@ -43,11 +50,11 @@ adds or updates a comment on the pull request with that link. The page embeds
 the MP4 in a mobile-friendly HTML5 video player, so it can be watched directly
 in Safari on an iPhone or iPad. Before publishing, CI re-encodes the preview as
 H.264 with a `yuv420p` pixel format, optional AAC audio, and fast-start metadata,
-and extracts a poster frame from the middle of the animation. Generated videos
+and extracts a scene-specific poster frame from the middle of each animation. Generated videos
 remain CI artifacts and Pages content; they are not committed to the working
 branch.
 
-Each preview page also offers commit-versioned **Download 1080p MP4** and
+Each scene section also offers commit-versioned **Download 1080p MP4** and
 **Download 720p preview** links, plus an **Open 1080p video** fallback. The
 1080p file is rendered natively by Manim at 1920×1080 and 60 FPS, then encoded
 as H.264 with `yuv420p`, CRF 18, and fast-start metadata. CI verifies its
