@@ -9,6 +9,7 @@ from manim import (
     Arrow,
     Axes,
     Create,
+    DecimalNumber,
     Dot,
     FadeIn,
     FadeOut,
@@ -53,9 +54,10 @@ class GradientDirectionScene(Scene):
             axis_config={"color": NEUTRAL_COLOR, "stroke_width": 2},
             tips=False,
         ).shift(DOWN * 0.35)
+        # Keep the axis name at the right end, away from the tick at five.
         x_label = Text("Weight", font_size=30, color=NEUTRAL_COLOR).next_to(
-            axes.x_axis, DOWN, buff=0.18
-        )
+            axes.x_axis.get_right(), DOWN, buff=0.22
+        ).align_to(axes.x_axis, RIGHT)
         y_label = Text("Loss", font_size=30, color=NEUTRAL_COLOR).next_to(
             axes.y_axis, LEFT, buff=0.18
         )
@@ -91,10 +93,12 @@ class GradientDirectionScene(Scene):
         sign = np.sign(weight_gradient(weight))
         direction = -sign if descent else sign
         side = RIGHT if weight > 5 else LEFT
-        center = side * 3.75 + UP * (0.95 if descent else 1.65)
+        # Reserve the open area inside the bowl, above the moving dots.
+        # Center each arrow so its label stays in the same safe column.
+        center = axes.c2p(5, 0) + side * 2.0 + UP * (3.1 if descent else 4.3)
         return Arrow(
-            center - RIGHT * direction * 0.08,
-            center + RIGHT * direction * 1.15,
+            center - RIGHT * direction * 0.615,
+            center + RIGHT * direction * 0.615,
             buff=0,
             color=DESCENT_COLOR if descent else GRADIENT_COLOR,
             stroke_width=7,
@@ -111,11 +115,24 @@ class GradientDirectionScene(Scene):
             )
         )
         side = RIGHT if start > 5 else LEFT
-        current = Text(
-            f"Current weight = {start:g}", font_size=34, color=POINT_COLOR
-        ).move_to(side * 4.25 + UP * 2.45)
+        current_prefix = Text("Current weight =", font_size=34, color=POINT_COLOR)
+        current_value = DecimalNumber(
+            tracker.get_value(),
+            num_decimal_places=2,
+            group_with_commas=False,
+            edge_to_fix=LEFT,
+            mob_class=Text,
+            font_size=34,
+            color=POINT_COLOR,
+        )
+        current = VGroup(current_prefix, current_value).arrange(
+            RIGHT, buff=0.15
+        ).move_to(side * 3.35 + UP * 2.65)
 
         self.play(FadeIn(dot), Write(current), run_time=0.7)
+        # Attach only after Write completes, and bind to the MAIN tracker.
+        # DecimalNumber keeps its left edge fixed as the digits change.
+        current_value.add_updater(lambda number: number.set_value(tracker.get_value()))
         self.wait(0.4)
 
         ghost_tracker = ValueTracker(start)
@@ -152,7 +169,7 @@ class GradientDirectionScene(Scene):
         self.wait(0.15)
 
         gradient_arrow = self._direction_arrow(axes, start, descent=False)
-        descent_arrow = self._direction_arrow(axes, start, descent=True).shift(DOWN * 1.25)
+        descent_arrow = self._direction_arrow(axes, start, descent=True)
         gradient_text = Text(
             "Gradient →" if weight_gradient(start) > 0 else "Gradient ←",
             font_size=32,
@@ -174,6 +191,10 @@ class GradientDirectionScene(Scene):
             destination = gradient_descent_step(destination, self.LEARNING_RATE)
         self.play(tracker.animate.set_value(destination), run_time=1.3)
         self.wait(0.35)
+        # Freeze the finished readout before fading; an updater must not
+        # recreate fully opaque digits while FadeOut is running.
+        current_value.set_value(tracker.get_value())
+        current_value.clear_updaters()
         self.play(
             FadeOut(
                 dot,
