@@ -14,31 +14,37 @@ concurrency:
 
 jobs:
   render:
-    name: Render scene
+    name: Render scenes
     runs-on: ubuntu-latest
     steps:
       - name: Check out pull request
         uses: actions/checkout@v4
 
-      - name: Render medium-quality preview
+      - name: Run tests
         run: |
-          docker run --rm \
-            --user "$(id -u):$(id -g)" \
-            --env HOME=/tmp \
-            --volume "$GITHUB_WORKSPACE:/manim" \
-            --workdir /manim \
-            manimcommunity/manim:v0.21.0 \
-            manim -qm src/viz/scenes/loss_gradient.py LossGradientScene
+          python -m pip install --upgrade pip
+          python -m pip install "pytest>=8,<9"
+          python -m pytest
 
-      - name: Render native 1080p export
+      - name: Render 720p previews and native 1080p exports
         run: |
-          docker run --rm \
-            --user "$(id -u):$(id -g)" \
-            --env HOME=/tmp \
-            --volume "$GITHUB_WORKSPACE:/manim" \
-            --workdir /manim \
-            manimcommunity/manim:v0.21.0 \
-            manim -qh src/viz/scenes/loss_gradient.py LossGradientScene
+          set -eu
+          scenes=(
+            "loss_gradient.py LossGradientScene"
+            "squared_error.py SquaredErrorScene"
+          )
+          for scene in "${scenes[@]}"; do
+            read -r file class <<< "$scene"
+            for quality in m h; do
+              docker run --rm \
+                --user "$(id -u):$(id -g)" \
+                --env HOME=/tmp \
+                --volume "$GITHUB_WORKSPACE:/manim" \
+                --workdir /manim \
+                manimcommunity/manim:v0.21.0 \
+                manim -q"$quality" "src/viz/scenes/$file" "$class"
+            done
+          done
 
       - name: Install FFmpeg
         run: |
@@ -47,64 +53,50 @@ jobs:
           ffmpeg -version
           ffprobe -version
 
-      - name: Encode Safari-compatible preview
+      - name: Collect and verify Safari-compatible videos
         env:
           COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -eu
-          preview_source="media/videos/loss_gradient/720p30/LossGradientScene.mp4"
-          export_source="media/videos/loss_gradient/1080p60/LossGradientScene.mp4"
           short_sha="$(printf '%s' "$COMMIT_SHA" | cut -c1-12)"
-          preview_name="LossGradientScene-${short_sha}-720p.mp4"
-          export_name="LossGradientScene-${short_sha}-1080p.mp4"
-          test -s "$preview_source"
-          test -s "$export_source"
+          scenes=(
+            "loss_gradient LossGradientScene"
+            "squared_error SquaredErrorScene"
+          )
           mkdir -p preview
+          for scene in "${scenes[@]}"; do
+            read -r module class <<< "$scene"
+            preview_name="${class}-${short_sha}-720p.mp4"
+            export_name="${class}-${short_sha}-1080p.mp4"
+            poster_name="${class}-${short_sha}-poster.jpg"
+            preview_source="media/videos/${module}/720p30/${class}.mp4"
+            export_source="media/videos/${module}/1080p60/${class}.mp4"
+            test -s "$preview_source"
+            test -s "$export_source"
 
-          ffmpeg -y \
-            -i "$preview_source" \
-            -map 0:v:0 \
-            -map '0:a:0?' \
-            -c:v libx264 \
-            -preset medium \
-            -crf 25 \
-            -pix_fmt yuv420p \
-            -c:a aac \
-            -b:a 128k \
-            -movflags +faststart \
-            "preview/$preview_name"
+            ffmpeg -y -i "$preview_source" -map 0:v:0 -map '0:a:0?' \
+              -c:v libx264 -preset medium -crf 25 -pix_fmt yuv420p \
+              -c:a aac -b:a 128k -movflags +faststart "preview/$preview_name"
+            ffmpeg -y -i "$export_source" -map 0:v:0 -an \
+              -c:v libx264 -preset slow -crf 18 -pix_fmt yuv420p \
+              -r 60 -movflags +faststart "preview/$export_name"
 
-          ffmpeg -y \
-            -i "$export_source" \
-            -map 0:v:0 \
-            -an \
-            -c:v libx264 \
-            -preset slow \
-            -crf 18 \
-            -pix_fmt yuv420p \
-            -r 60 \
-            -movflags +faststart \
-            "preview/$export_name"
+            duration="$(ffprobe -v error -show_entries format=duration \
+              -of default=noprint_wrappers=1:nokey=1 "preview/$preview_name")"
+            midpoint="$(awk -v duration="$duration" 'BEGIN { printf "%.3f", duration / 2 }')"
+            ffmpeg -y -ss "$midpoint" -i "preview/$preview_name" \
+              -frames:v 1 -q:v 2 "preview/$poster_name"
 
-          duration="$(ffprobe -v error -show_entries format=duration \
-            -of default=noprint_wrappers=1:nokey=1 "preview/$preview_name")"
-          midpoint="$(awk -v duration="$duration" 'BEGIN { printf "%.3f", duration / 2 }')"
-          ffmpeg -y \
-            -ss "$midpoint" \
-            -i "preview/$preview_name" \
-            -frames:v 1 \
-            -q:v 2 \
-            preview/poster.jpg
-
-          export_spec="$(ffprobe -v error -select_streams v:0 \
-            -show_entries stream=width,height,r_frame_rate \
-            -of csv=p=0 "preview/$export_name")"
-          test "$export_spec" = "1920,1080,60/1"
-          ffmpeg -v error -i "preview/$preview_name" -f null -
-          ffmpeg -v error -i "preview/$export_name" -f null -
-          test -s "preview/$preview_name"
-          test -s "preview/$export_name"
-          test -s preview/poster.jpg
+            preview_spec="$(ffprobe -v error -select_streams v:0 \
+              -show_entries stream=width,height,r_frame_rate -of csv=p=0 "preview/$preview_name")"
+            export_spec="$(ffprobe -v error -select_streams v:0 \
+              -show_entries stream=width,height,r_frame_rate -of csv=p=0 "preview/$export_name")"
+            test "$preview_spec" = "1280,720,30/1"
+            test "$export_spec" = "1920,1080,60/1"
+            ffmpeg -v error -i "preview/$preview_name" -f null -
+            ffmpeg -v error -i "preview/$export_name" -f null -
+            test -s "preview/$poster_name"
+          done
 
       - name: Build preview page
         env:
@@ -113,42 +105,48 @@ jobs:
         run: |
           set -eu
           short_sha="$(printf '%s' "$COMMIT_SHA" | cut -c1-12)"
-          preview_name="LossGradientScene-${short_sha}-720p.mp4"
-          export_name="LossGradientScene-${short_sha}-1080p.mp4"
-          test -s "preview/$preview_name"
-          test -s "preview/$export_name"
-          test -s preview/poster.jpg
           cat > preview/index.html <<EOF
-          <!doctype html>
-          <html lang="en">
-            <head>
-              <meta charset="utf-8">
-              <meta name="viewport" content="width=device-width, initial-scale=1">
-              <title>LossGradientScene preview</title>
-              <style>
-                body { margin: 0 auto; max-width: 60rem; padding: 1rem; font-family: system-ui, sans-serif; }
-                video { display: block; width: 100%; height: auto; background: #000; }
-                code { overflow-wrap: anywhere; }
-                .downloads { display: grid; gap: 0.75rem; margin-top: 1rem; }
-                a { color: #0969da; font-size: 1.05rem; }
-              </style>
-            </head>
-            <body>
-              <h1>LossGradientScene</h1>
-              <p>Pull request #${PR_NUMBER} · <code>${COMMIT_SHA}</code></p>
-              <video controls playsinline preload="metadata" poster="poster.jpg">
-                <source src="${preview_name}" type="video/mp4">
-                Your browser does not support HTML5 video.
-              </video>
-              <div class="downloads">
-                <a href="${export_name}" download>Download 1080p MP4</a>
-                <a href="${preview_name}" download>Download 720p preview</a>
-                <a href="${export_name}">Open 1080p video</a>
-              </div>
-            </body>
-          </html>
+          <!doctype html><html lang="en"><head><meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>Manim scene previews</title><style>
+          body { margin: 0 auto; max-width: 60rem; padding: 1rem; font-family: system-ui,sans-serif; }
+          section { margin: 2rem 0 3rem; } video { display:block; width:100%; height:auto; background:#000; }
+          code { overflow-wrap:anywhere; } .downloads { display:grid; gap:.75rem; margin-top:1rem; }
+          a { color:#0969da; font-size:1.05rem; }
+          </style></head><body><h1>Manim scene previews</h1>
+          <p>Pull request #${PR_NUMBER} · <code>${COMMIT_SHA}</code></p>
           EOF
-          test -s preview/index.html
+          scenes=(LossGradientScene SquaredErrorScene)
+          for class in "${scenes[@]}"; do
+            preview_name="${class}-${short_sha}-720p.mp4"
+            export_name="${class}-${short_sha}-1080p.mp4"
+            poster_name="${class}-${short_sha}-poster.jpg"
+            test -s "preview/$preview_name"
+            test -s "preview/$export_name"
+            test -s "preview/$poster_name"
+            cat >> preview/index.html <<EOF
+          <section><h2>${class}</h2>
+          <video controls playsinline preload="metadata" poster="${poster_name}">
+          <source src="${preview_name}" type="video/mp4">Your browser does not support HTML5 video.</video>
+          <div class="downloads"><a href="${export_name}" download>Download 1080p MP4</a>
+          <a href="${preview_name}" download>Download 720p preview</a>
+          <a href="${export_name}">Open 1080p video</a></div></section>
+          EOF
+          done
+          echo '</body></html>' >> preview/index.html
+          python - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+
+          class AssetParser(HTMLParser):
+              def handle_starttag(self, tag, attrs):
+                  for name, value in attrs:
+                      if name in {"href", "poster", "src"}:
+                          path = Path("preview", value)
+                          assert path.is_file() and path.stat().st_size, path
+
+          AssetParser().feed(Path("preview/index.html").read_text())
+          PY
 
       - name: Upload preview artifact
         uses: actions/upload-artifact@v4
@@ -188,8 +186,9 @@ jobs:
             const repoPath = repo === `${owner}.github.io` ? '' : `/${repo}`;
             const previewUrl = `https://${owner}.github.io${repoPath}/pr-${number}/`;
             const shortSha = context.payload.pull_request.head.sha.slice(0, 12);
-            const exportUrl = `${previewUrl}LossGradientScene-${shortSha}-1080p.mp4`;
-            const body = `${marker}\n🎬 [Watch the Manim preview](${previewUrl})\n⬇️ [Download the 1080p MP4](${exportUrl})\n\nUpdated for \`${shortSha.slice(0, 7)}\`.`;
+            const lossUrl = `${previewUrl}LossGradientScene-${shortSha}-1080p.mp4`;
+            const squaredUrl = `${previewUrl}SquaredErrorScene-${shortSha}-1080p.mp4`;
+            const body = `${marker}\n🎬 [Watch both Manim previews](${previewUrl})\n⬇️ [Download LossGradientScene 1080p](${lossUrl})\n⬇️ [Download SquaredErrorScene 1080p](${squaredUrl})\n\nUpdated for \`${shortSha.slice(0, 7)}\`.`;
             const comments = await github.paginate(github.rest.issues.listComments, {
               owner,
               repo,
