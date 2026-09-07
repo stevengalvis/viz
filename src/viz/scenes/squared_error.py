@@ -11,8 +11,8 @@ from manim import (
     FadeOut,
     Line,
     Scene,
-    Square,
     Text,
+    Transform,
     VGroup,
     Write,
 )
@@ -24,11 +24,11 @@ NEUTRAL_COLOR = "#B8C0CC"
 PREDICTION_COLOR = "#F4B942"
 TARGET_COLOR = "#2EC4B6"
 ERROR_COLOR = "#FF6B6B"
-SQUARE_COLOR = "#5DA9E9"
+LOSS_COLOR = "#5DA9E9"
 
 
 class SquaredErrorScene(Scene):
-    """Explain squared error geometrically using one prediction."""
+    """Explain squared error using one prediction-target example."""
 
     PREDICTION = 7
     TARGET = 5
@@ -92,41 +92,32 @@ class SquaredErrorScene(Scene):
             brace, UP, buff=0.2
         )
         self.play(Create(brace), Write(error_label), run_time=0.8)
-        self.wait(1.5)
+        self.wait(1.2)
 
-        first_stage = VGroup(
+        number_line_stage = VGroup(
             number_line,
             target_marker,
             prediction_marker,
             prediction_label,
             target_label,
             brace,
-            error_label,
         )
-        self.play(FadeOut(first_stage), run_time=0.6)
-
-        square = Square(side_length=3.2, color=SQUARE_COLOR, stroke_width=6).shift(
-            DOWN * 0.15
+        error_expression = Text(
+            f"Error: {prediction} - {target} = {error}",
+            font_size=52,
+            color=ERROR_COLOR,
         )
-        divider_v = Line(
-            square.get_top(), square.get_bottom(), color=SQUARE_COLOR, stroke_width=4
+        self.play(
+            FadeOut(number_line_stage),
+            Transform(error_label, error_expression),
+            run_time=0.8,
         )
-        divider_h = Line(
-            square.get_left(), square.get_right(), color=SQUARE_COLOR, stroke_width=4
-        )
-        grid = VGroup(square, divider_v, divider_h)
-        side_label = Text(f"error = {error}", font_size=34, color=ERROR_COLOR).next_to(
-            square, LEFT, buff=0.45
-        )
-        equation = Text(
-            f"{error} × {error} = {loss:g}", font_size=48, color=NEUTRAL_COLOR
-        ).next_to(square, RIGHT, buff=0.65)
-        self.play(Create(grid), Write(side_label), run_time=1.2)
-        self.play(Write(equation), run_time=0.8)
-        self.wait(0.8)
+        self.wait(1.2)
 
         final_label = Text(
-            f"Squared loss: {loss:g}", font_size=50, color=SQUARE_COLOR
-        ).to_edge(UP, buff=0.55)
-        self.play(FadeIn(final_label), run_time=0.7)
+            f"Squared loss: {error} × {error} = {loss:g}",
+            font_size=52,
+            color=LOSS_COLOR,
+        )
+        self.play(Transform(error_label, final_label), run_time=0.8)
         self.wait(2.0)
