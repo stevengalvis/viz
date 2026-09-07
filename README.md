@@ -35,14 +35,20 @@ To render the squared-error example instead, run:
 manim -pql src/viz/scenes/squared_error.py SquaredErrorScene
 ```
 
+To learn why gradient descent moves a weight left or right, run:
+
+```bash
+manim -pql src/viz/scenes/gradient_direction.py GradientDirectionScene
+```
+
 Manim writes the rendered video under `media/videos/` by default. The `-p`
 flag opens the result when the host environment supports it; omit `-p` in a
 headless environment.
 
 ## Pull request video previews
 
-The `Manim PR preview` GitHub Actions workflow renders both `LossGradientScene`
-and `SquaredErrorScene` in
+The `Manim PR preview` GitHub Actions workflow renders `LossGradientScene`,
+`SquaredErrorScene`, and `GradientDirectionScene` in
 the official Manim Community 0.21 Docker image for every opened, reopened, or
 updated pull request. If rendering succeeds, it publishes a small HTML page at
 a PR-specific path such as `https://<owner>.github.io/<repository>/pr-1/` and
