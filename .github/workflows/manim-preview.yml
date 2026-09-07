@@ -35,7 +35,7 @@ jobs:
             --workdir /manim \
             --env PYTHONPATH=/manim/src \
             manimcommunity/manim:v0.21.0 \
-            python -c "import viz.calculations; import viz.scenes.loss_gradient; import viz.scenes.squared_error"
+            python -c "import viz.calculations; import viz.scenes.loss_gradient; import viz.scenes.squared_error; import viz.scenes.gradient_direction"
 
       - name: Render 720p previews and native 1080p exports
         run: |
@@ -43,6 +43,7 @@ jobs:
           scenes=(
             "loss_gradient.py LossGradientScene"
             "squared_error.py SquaredErrorScene"
+            "gradient_direction.py GradientDirectionScene"
           )
           for scene in "${scenes[@]}"; do
             read -r file class <<< "$scene"
@@ -74,6 +75,7 @@ jobs:
           scenes=(
             "loss_gradient LossGradientScene"
             "squared_error SquaredErrorScene"
+            "gradient_direction GradientDirectionScene"
           )
           mkdir -p preview
           for scene in "${scenes[@]}"; do
@@ -128,7 +130,7 @@ jobs:
           </style></head><body><h1>Manim scene previews</h1>
           <p>Pull request #${PR_NUMBER} · <code>${COMMIT_SHA}</code></p>
           EOF
-          scenes=(LossGradientScene SquaredErrorScene)
+          scenes=(LossGradientScene SquaredErrorScene GradientDirectionScene)
           for class in "${scenes[@]}"; do
             preview_name="${class}-${short_sha}-720p.mp4"
             export_name="${class}-${short_sha}-1080p.mp4"
@@ -200,7 +202,8 @@ jobs:
             const shortSha = context.payload.pull_request.head.sha.slice(0, 12);
             const lossUrl = `${previewUrl}LossGradientScene-${shortSha}-1080p.mp4`;
             const squaredUrl = `${previewUrl}SquaredErrorScene-${shortSha}-1080p.mp4`;
-            const body = `${marker}\n🎬 [Watch both Manim previews](${previewUrl})\n⬇️ [Download LossGradientScene 1080p](${lossUrl})\n⬇️ [Download SquaredErrorScene 1080p](${squaredUrl})\n\nUpdated for \`${shortSha.slice(0, 7)}\`.`;
+            const directionUrl = `${previewUrl}GradientDirectionScene-${shortSha}-1080p.mp4`;
+            const body = `${marker}\n🎬 [Watch all three Manim previews](${previewUrl})\n⬇️ [Download LossGradientScene 1080p](${lossUrl})\n⬇️ [Download SquaredErrorScene 1080p](${squaredUrl})\n⬇️ [Download GradientDirectionScene 1080p](${directionUrl})\n\nUpdated for \`${shortSha.slice(0, 7)}\`.`;
             const comments = await github.paginate(github.rest.issues.listComments, {
               owner,
               repo,
